@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Reflex Bot</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --chat-bg: #0a0a0a;
+            --text-color: #e0e0e0;
+            --accent-color: #00f3ff;
+            --user-msg-bg: #1a1a1a;
+            --bot-msg-color: #00f3ff;
+            --font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 聊天区域 */
+        #chat-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            scroll-behavior: auto; /* 无延迟，硬切 */
+        }
+
+        /* 滚动条美化 */
+        #chat-container::-webkit-scrollbar { width: 5px; }
+        #chat-container::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+        .message {
+            max-width: 80%;
+            padding: 10px 16px;
+            border-radius: 8px;
+            line-height: 1.5;
+            font-size: 15px;
+            animation: fadeIn 0.1s ease-out; /* 极速淡入 */
+        }
+
+        /* 机器人消息样式 */
+        .bot-msg {
+            align-self: flex-start;
+            color: var(--bot-msg-color);
+            border-left: 2px solid var(--accent-color);
+            background: rgba(0, 243, 255, 0.03);
+            font-family: 'Courier New', monospace; /* 机械感字体 */
+            text-shadow: 0 0 5px rgba(0, 243, 255, 0.3); /* 淡淡的辉光 */
+        }
+
+        /* 用户消息样式 */
+        .user-msg {
+            align-self: flex-end;
+            background-color: var(--user-msg-bg);
+            color: #fff;
+            border: 1px solid #333;
+        }
+
+        /* --- 底部输入区的核心容器 --- */
+        #input-area {
+            background-color: var(--chat-bg);
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        /* 流光边框容器 */
+        .glowing-border-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            padding: 2px; /* 边框宽度 */
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        /* 流光动画核心：旋转的渐变背景 */
+        .glowing-border-wrapper::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: conic-gradient(
+                transparent, 
+                #00f3ff, 
+                #bc13fe, 
+                #00f3ff, 
+                transparent
+            );
+            animation: rotate 4s linear infinite; /* 旋转速度 */
+        }
+
+        @keyframes rotate {
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 真正的输入框（盖在流光上面） */
+        #user-input {
+            position: relative;
+            width: 100%;
+            background-color: #000;
+            border: none;
+            color: #fff;
+            padding: 14px 20px;
+            font-size: 16px;
+            outline: none;
+            border-radius: 4px; /* 比外层略小 */
+            z-index: 2;
+        }
+
+        #user-input::placeholder { color: #555; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="chat-container">
+        <div class="message bot-msg">
+            SYSTEM ONLINE.<br>无需等待，指令将立即被执行。
+        </div>
+    </div>
+
+    <div id="input-area">
+        <div class="glowing-border-wrapper">
+            <input type="text" id="user-input" placeholder="输入关键词 (try: hello, color, speed, css)..." autocomplete="off" autofocus>
+        </div>
+    </div>
+
+    <script>
+        // --- 核心配置：大脑 ---
+        // 键：触发词（全小写）。值：回复内容。
+        const KNOWLEDGE_BASE = {
+            "hello": "LINK ESTABLISHED. READY.",
+            "hi": "接收到信号。请讲。",
+            "name": "我是代号 [SPECTRE] 的自动应答单元。",
+            "color": "检测到偏好设置：暗夜霓虹 (Dark Neon)。",
+            "time": "时间是流动的错觉，现在就是此刻。",
+            "speed": "零延迟响应模式已激活。",
+            "css": "样式表加载完毕。渲染引擎：Chrome V8。",
+            "help": "指令集：hello, name, color, speed, time, bye...",
+            "bye": "正在切断连接... SESSION CLOSED."
+        };
+        
+        // 默认兜底回复
+        const FALLBACKS = [
+            "指令未识别。",
+            "DATA_NOT_FOUND",
+            "无法解析该请求，请重新输入。",
+            "输入无效。"
+        ];
+
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+
+        // 处理输入事件
+        userInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                const text = userInput.value.trim();
+                if (text) {
+                    processMessage(text);
+                    userInput.value = ''; // 立即清空
+                }
+            }
+        });
+
+        function processMessage(text) {
+            // 1. 立即显示用户消息
+            addMessage(text, 'user');
+
+            // 2. 匹配逻辑 (大小写不敏感，支持包含匹配)
+            const lowerText = text.toLowerCase();
+            let response = null;
+
+            // 优先全匹配，然后模糊匹配
+            for (let key in KNOWLEDGE_BASE) {
+                if (lowerText.includes(key)) {
+                    response = KNOWLEDGE_BASE[key];
+                    break;
+                }
+            }
+
+            // 如果没有匹配到
+            if (!response) {
+                response = FALLBACKS[Math.floor(Math.random() * FALLBACKS.length)];
+            }
+
+            // 3. 立即（无延迟）显示回复
+            // 尽管是立即执行，稍微放在微任务里保证DOM渲染顺序通常更稳健，但这里追求"无延迟"体感直接调用
+            addMessage(response, 'bot');
+        }
+
+        function addMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = `message ${type === 'bot' ? 'bot-msg' : 'user-msg'}`;
+            div.innerHTML = text; // 支持简单的HTML标签
+            chatContainer.appendChild(div);
+            
+            // 保持卷轴在最底部
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>
