@@ -1,195 +1,95 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>暗色关键词自动回复聊天</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #0d1117;
-            color: #c9d1d9;
-        }
-        #chat-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            background-color: #0d1117;
-        }
-        .message {
-            max-width: 70%;
-            padding: 10px 14px;
-            border-radius: 18px;
-            line-height: 1.4;
-            word-wrap: break-word;
-        }
-        .user {
-            align-self: flex-end;
-            background-color: #238636;
-            color: white;
-            border-bottom-right-radius: 4px;
-        }
-        .bot {
-            align-self: flex-start;
-            background-color: #21262d;
-            color: #c9d1d9;
-            border-bottom-left-radius: 4px;
-        }
-        #input-area {
-            padding: 10px 16px;
-            background-color: #161b22;
-            border-top: 1px solid #30363d;
-        }
-        #input {
-            width: 100%;
-            padding: 14px 18px;
-            border: none;
-            border-radius: 28px;
-            font-size: 16px;
-            outline: none;
-            background-color: rgba(13, 17, 23, 0.9);
-            color: white;
-            position: relative;
-            z-index: 2;
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
-            transition: box-shadow 0.4s ease;
-            will-change: transform;
-        }
-        #input:focus {
-            box-shadow: 0 0 30px rgba(59, 130, 246, 0.7), 0 0 10px rgba(139, 92, 246, 0.6) inset;
-        }
+<meta charset="UTF-8">
+<style>
+    /* 1. 基础页面设置：让一切居中，且背景全黑 */
+   body {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+    
+    /* 核心修改：使用渐变色作为全屏背景 */
+    /* 你可以把颜色代码换成你喜欢的 */
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); 
+}
 
-        /* 外层流光（慢速正向） */
-        #input::before {
-            content: '';
-            position: absolute;
-            inset: -8px;
-            border-radius: 36px;
-            background: conic-gradient(
-                #8b5cf6, #a78bfa, #3b82f6, #06d9d4, #8b5cf6
-            );
-            animation: rotate 5s linear infinite;
-            filter: blur(12px);
-            opacity: 0.7;
-            z-index: -1;
-            transition: all 0.4s ease;
-        }
+    /* 2. 容器：用来限制流动光环的范围 */
+    .search-box {
+        position: relative;
+        width: 350px;
+        border-radius: 20px; /* 圆角 */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        /* 为了流光特效，我们不给容器设背景色，而是靠下面的伪元素 */
+    }
 
-        /* 内层流光（快速反向） */
-        #input::after {
-            content: '';
-            position: absolute;
-            inset: -4px;
-            border-radius: 32px;
-            background: conic-gradient(
-                #3b82f6, #06d9d4, #a78bfa, #8b5cf6, #3b82f6
-            );
-            animation: rotate 2s linear infinite reverse;
-            filter: blur(8px);
-            opacity: 0.5;
-            z-index: -1;
-            transition: all 0.4s ease;
-        }
+    /* 3. 核心：创建两个伪元素来实现流光渐变边框 */
+    .search-box::before,
+    .search-box::after {
+        content: '';
+        position: absolute;
+        width: 356px;  /* 比输入框稍微大一点 */
+        height: 60px;  /* 比输入框稍微大一点 */
+        background: linear-gradient(45deg, #001aff, #eeff00, #00ffaa, #ff0055);
+        background-size: 400%; /* 拉大背景，让渐变颜色过渡更自然 */
+        border-radius: 20px;
+        z-index: -1; /* 放到输入框后面 */
+        animation: flowingLight 20s linear infinite; /* 20秒无限循环转动 */
+    }
 
-        #input:focus::before {
-            opacity: 1;
-            filter: blur(18px);
-            animation-duration: 2s;
-        }
-        #input:focus::after {
-            opacity: 0.9;
-            filter: blur(12px);
-            animation-duration: 1s;
-        }
+    /* after 元素用来做模糊光晕（发光效果） */
+    .search-box::after {
+        filter: blur(20px); /* 高斯模糊 */
+        opacity: 0.8;
+    }
 
-        @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-    </style>
+    /* 4. 输入框本体样式 */
+    .search-box input {
+        width: 100%;
+        height: 54px; /* 比流光层小一点 */
+        background-color: #1d1d1d; /* 深色背景挡住中间的流光 */
+        border: none;
+        outline: none;
+        border-radius: 18px; /* 圆角略小于容器 */
+        padding: 0 20px;
+        font-size: 1.2rem;
+        color: #ffffff4c; /* 字体蓝色 */
+        letter-spacing: 1px;
+        transition: 0.3s;
+        box-shadow: inset 2px 2px 5px rgba(0,0,0,0.5); /* 内部阴影更有质感 */
+    }
+
+    /* 占位符颜色 */
+    .search-box input::placeholder {
+        color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* 5. 交互：聚焦时输入框变亮一点 */
+    .search-box input:focus {
+        background-color: #252525;
+        color: #fff;
+    }
+
+    /* 6. 定义流光动画 */
+    @keyframes flowingLight {
+        0% { background-position: 0 0; }
+        50% { background-position: 300% 0; }
+        100% { background-position: 0 0; }
+    }
+
+</style>
 </head>
 <body>
-    <div id="chat-container"></div>
-    <div id="input-area">
-        <input type="text" id="input" placeholder="输入消息，按回车发送..." autocomplete="off">
+
+    <div class="search-box">
+        <input type="text" placeholder="请输入...">
     </div>
 
-    <script>
-        const chatContainer = document.getElementById('chat-container');
-        const input = document.getElementById('input');
-
-        // 通用随机回复（无关键词匹配时使用）
-        const defaultReplies = [
-            "收到啦！",
-            "我明白你的意思了。",
-            "很有趣哦！",
-            "继续说，我在听呢。",
-            "嗯嗯，同意！",
-            "哈哈，真有意思。"
-        ];
-
-        // 关键词匹配规则（可继续扩展）
-        const repliesMap = [
-            { keyword: "你好", reply: "你好！很高兴和你聊天～" },
-            { keyword: "hi", reply: "Hi! How can I help you?" },
-            { keyword: "hello", reply: "Hello! What's up?" },
-            { keyword: "天气", reply: "今天天气不错，适合出门走走哦～" },
-            { keyword: "名字", reply: "我叫小G，是你的自动回复助手。" },
-            { keyword: "再见", reply: "再见！下次再聊～" },
-            { keyword: "谢谢", reply: "不客气！" },
-            { keyword: "爱你", reply: "我也喜欢你哦～😘" },
-            { keyword: "笑话", reply: "为什么程序员喜欢暗色模式？因为亮了就报错！😂" },
-            { keyword: "飞飞飞", reply: "飞飞飞主人好！有什么可以帮你的吗？✨" } // 特别为你加的
-        ];
-
-        function addMessage(text, sender) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `message ${sender}`;
-            msgDiv.textContent = text;
-            chatContainer.appendChild(msgDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        function getBotReply(userText) {
-            const lowerText = userText.toLowerCase();
-
-            // 优先匹配关键词
-            for (const item of repliesMap) {
-                if (lowerText.includes(item.keyword.toLowerCase())) {
-                    return item.reply;
-                }
-            }
-
-            // 无匹配时随机通用回复
-            const randomReply = defaultReplies[Math.floor(Math.random() * defaultReplies.length)];
-            return randomReply;
-        }
-
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && input.value.trim() !== '') {
-                const userText = input.value.trim();
-                addMessage(userText, 'user');
-                input.value = '';
-
-                // 无延迟直接回复
-                const botReply = getBotReply(userText);
-                addMessage(botReply, 'bot');
-            }
-        });
-
-        // 欢迎消息
-        addMessage("你好，飞飞飞！暗色系界面 + 流光输入框已就绪，关键词自动回复（无延迟）启动～试试说“你好”或“笑话”看看！", 'bot');
-    </script>
 </body>
 </html>
